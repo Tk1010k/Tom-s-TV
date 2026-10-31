@@ -1,1 +1,44 @@
+name: Build APK
 
+on:
+  workflow_dispatch:
+  push:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: unzip -q TomsTV.zip
+
+      - name: Upload Android source for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: toms-tv-source
+          path: TomsTV/
+          if-no-files-found: error
+          retention-days: 7
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - run: gradle -p TomsTV assembleDebug --no-daemon
+
+      - run: cp TomsTV/app/build/outputs/apk/debug/app-debug.apk TomsTV.apk
+
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v${{ github.run_number }}" TomsTV.apk --title "Tom's TV ${{ github.run_number }}" --notes "Build"
